@@ -1,25 +1,26 @@
 name: Fechar Issue ao Mesclar PR
-
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
-  fecharIssue:
+  fechar_issue:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Verificar repositório
-        uses: actions/checkout@v2
-        
-      - name: Fechar Issue
-        if: github.event.review.state == 'approved' && contains(github.event.pull_request.body, 'Resolves #')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NUMERO_ISSUE=$(echo "${{ github.event.pull_request.body }}" | grep -oP 'Resolves\s*:? #\K[0-9]+' | head -1)
-          if [ -n "$NUMERO_ISSUE" ]; then
-            echo "Fechando Issue $NUMERO_ISSUE"
-            curl -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{"state":"closed"}' "https://api.github.com/repos/${{ github.repository }}/issues/$NUMERO_ISSUE"
-          else
-            echo "Nenhuma issue referenciada para fechar no pull request."
-          fi
+    - name: Baixar repositório
+      uses: actions/checkout@v2
+
+    - name: Fechar issue referenciada
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        corpo_pr=$(jq -r .pull_request.body "$GITHUB_EVENT_PATH")
+        numeros_issues=$(echo "$corpo_pr" | grep -oE '#[0-9]+' | tr -d '#')
+
+        for numero_issue in $numeros_issues; do
+          curl -s -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/$numero_issue \
+            -d '{"state": "closed"}'
+        done
