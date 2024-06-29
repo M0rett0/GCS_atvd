@@ -1,0 +1,25 @@
+name: Fechar Issue ao Mesclar PR
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  fecharIssue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar repositório
+        uses: actions/checkout@v2
+        
+      - name: Fechar Issue
+        if: github.event.review.state == 'approved' && contains(github.event.pull_request.body, 'Resolves #')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUMERO_ISSUE=$(echo "${{ github.event.pull_request.body }}" | grep -oP 'Resolves\s*:? #\K[0-9]+' | head -1)
+          if [ -n "$NUMERO_ISSUE" ]; then
+            echo "Fechando Issue $NUMERO_ISSUE"
+            curl -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{"state":"closed"}' "https://api.github.com/repos/${{ github.repository }}/issues/$NUMERO_ISSUE"
+          else
+            echo "Nenhuma issue referenciada para fechar no pull request."
+          fi
